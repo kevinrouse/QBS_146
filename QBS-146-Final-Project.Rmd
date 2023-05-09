@@ -1,0 +1,78 @@
+---
+title: "QBS-146-Final-Project"
+output: pdf_document
+---
+
+```{r}
+#if (!require("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+
+#BiocManager::install("sva")
+#BiocManager::install('limma')
+#BiocManager::install('genefilter')
+```
+```{r}
+data = read.csv('~/Desktop/Education/Spring Term/QBS-146/GSE174159_raw_counts_S16082.txt',sep='\t', row.names = 1)
+colnames(data)[-1] = unlist(lapply(colnames(data)[-1],substring,first=2))
+head(data)
+```
+
+```{r}
+status = list("6_24_AM_NT" = "CD", 
+             "9_23_Q_TNF" = "CD",
+             "12_54_AM_TNF" = "CD",
+             "20_84_Q_IS" = "CD",
+             "7_91_AM_NT"= "CD",
+             "10_99_Q_TNF" = "CD",
+             "13_54_AM_TNF"="CD",
+             "17_3_Q_IS"="CD",
+             "2_57_Q_NT"="CD",
+             "11_100_Q_TNF" = "CD",
+             "18_7_Q_IS" = "CD",
+             "1_28_Q_NT" = "CD",
+             "4_80_Q_NT"="CD",
+             "5_82_AM_NT"="CD",
+             "15_94_AM_TNF"="CD",
+             "21_1_Q_5ASA" = "UC",
+             "26_49_AM_5ASA" = "UC",
+             "27_49_AM_5ASA"= "UC",
+             "35_68_AM_TNF_RCH" = "UC", # 35_68_AM_TNF
+             "37_55_AM_TNF_RCH" = "UC", # 37_55_AM_TNF
+             "45_41" = "HC",
+             "44_18" = "HC",
+             "43_9" = "HC",
+             "42_2" = "HC",
+             "38_90_AS_Cort" = "UC",
+             "36_55_AM_TNF_RCH" = "UC",  # 36_55_AM_TNF
+             "32_20_AM_5ASA" = "UC",
+             "31_20_AM_5ASA" = "UC",
+             "29_85_AM_5ASA" = "UC",
+             "28_85_AM_5ASA" = "UC",
+             "24_22_Q_5ASA" = "UC",
+             "23_21_Q_5ASA" = "UC",
+             "22_1_Q_5ASA" = "UC", 
+             "19_83_Q_IS" = "CD",
+             "8_47_Q_TNF" = "CD",
+             "46_50" = "HC",
+             "41_96_AS_Cort" = "UC",
+             "40_44_AS_Cort" = "UC",
+             "39_93_AS_Cort" = "UC")
+```
+
+```{r}
+library(genefilter)
+library(sva)
+library(limma)
+```
+```{r}
+data_sorted = data[,c(1,match(names(data)[-1], names(status)))]
+```
+
+```{r}
+data_sorted
+```
+```{r}
+labels = unname(unlist(status[ ]))
+labels
+```
+
