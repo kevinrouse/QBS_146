@@ -12,9 +12,10 @@ knitr::opts_chunk$set(echo = TRUE)
 LOADING THE THREE DATASETS
 ```{r}
 
-data1 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE174159_raw_counts_S16082.txt", sep="\t")
+data1 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE174159_raw_counts_S16082.txt", sep="\t", row.names=1)
+colnames(data1)[-1] = unlist(lapply(colnames(data1)[-1],substring,first=2))
 
-data2 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE126299_featurecounts_upload.gene.quant.txt", sep = "\t")
+data2 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE126299_featurecounts_upload.gene.quant.txt", sep = "\t", row.names=1)
 
 data3 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE186507_MSCCR_Blood_counts.txt", sep=" ")
 
@@ -22,6 +23,6 @@ data3 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@
 
 LOADING data3 labels
 ```{r}
-data3_labels <- read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/data3_labels.csv", header=F, col.names = "Treatment")
+data3_labels <- read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/data3_labels.csv")
 ```
 
