@@ -1,0 +1,27 @@
+---
+title: "Load Data"
+author: "Anton Hung"
+date: "2023-05-09"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+LOADING THE THREE DATASETS
+```{r}
+
+data1 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE174159_raw_counts_S16082.txt", sep="\t")
+
+data2 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE126299_featurecounts_upload.gene.quant.txt", sep = "\t")
+
+data3 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE186507_MSCCR_Blood_counts.txt", sep=" ")
+
+```
+
+LOADING data3 labels
+```{r}
+data3_labels <- read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/data3_labels.csv", header=F, col.names = "Treatment")
+```
+
