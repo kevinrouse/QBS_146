@@ -1,0 +1,429 @@
+---
+title: "Differential Expression Analysis"
+author: "Anton Hung"
+date: "2023-05-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+if (!require("BiocManager", quietly = TRUE)) 
+  install.packages("BiocManager") 
+BiocManager::install("edgeR")
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("goseq")
+BiocManager::install("TxDb.Hsapiens.UCSC.hg38.knownGene")
+
+
+```
+
+
+```{r}
+# library sizes
+library(tidyverse)
+library("edgeR")
+
+```
+
+```{r}
+dgeObj <- DGEList(data3)
+
+my.df <- cbind(Samples = rownames(dgeObj$samples),dgeObj$samples)
+my.barplot <- ggplot(my.df, aes(x=Samples, y=lib.size)) +
+  geom_bar(stat="identity", width=0.5) +
+  xlab("Samples") + ylab("Libary Size") +
+  theme_light()
+my.barplot  
+
+# Yes, it is recommended to eliminate samples if their library sizes differ drastically from the others. This is because the library size can affect the number of reads that map to each gene and can lead to biased results1.
+# 
+# However, there are normalization methods that can be used to adjust for differences in library size2. For example, DESeq2 uses a relative log expression (RLE) normalization and edgeR uses a trimmed mean of m-value (TMM) normalization12
+```
+We calculate CPMs and filter out genes with low CPMs because:
+1. Genes with very low counts across all libraries provide little evidence for differential expression
+2. They interfere with statistical approximations used later in the pipeline
+3. They introduce multiple testing burden when estimating FDR, reducing power to detect DE genes.
+
+4. CPM is in effect normalizing samples. different samples can have different sequencing depths, so we cannot filter using just raw counts.
+
+```{r}
+# mycpm <- cpm(data1)
+# my.df <- data.frame()
+# for (sample.name in colnames(data1)) {
+#   mat <- cbind(CPM = mycpm[, sample.name],
+#                Counts = data1[,sample.name],
+#                Sample = rep(sample.name, nrow(data1)))
+#   my.df <- rbind(my.df, mat)
+# }
+# dim(my.df)
+```
+
+Same as above except that Bing AI made it much faster so it can run on data3
+```{r}
+library(dplyr)
+mycpm <- cpm(data3)
+my.df <- data.frame()
+# Use lapply instead of for loop to iterate over columns
+my.list <- lapply(colnames(data3), function(sample.name) {
+  # Use data.frame instead of cbind to avoid coercion
+  data.frame(CPM = mycpm[, sample.name],
+             Counts = data3[,sample.name])
+             # Sample = sample.name)
+})
+# Use do.call and rbind to combine the list elements into one data frame
+my.df <- do.call(rbind, my.list[1:100])
+# my.df <- bind_rows(my.list)
+dim(my.df)
+
+```
+
+Plotting CPM values against raw counts. Used to estimate an approximate CPM:raw_count ratio.
+It is standard to filter genes 
+```{r}
+my.df$CPM <- as.numeric(my.df$CPM)
+my.hist <- ggplot(data=my.df, aes(x = CPM)) +
+  geom_histogram(binwidth=0.5) +
+  ggtitle("Distribution of CPM") +
+  labs(y= "Frequency", x= "CPM") +
+  theme_minimal() +
+  xlim(0,20) + ylim(0,100000)
+my.hist
+```
+
+
+```{r}
+my.df$Counts <- as.numeric(my.df$Counts)
+my.df.sample1 <- my.df[my.df$Sample=="MSCCR_reGRID_1",]
+my.scatter <- ggplot(data=my.df, aes(x=CPM, y=Counts)) +
+  geom_point() +
+  labs(x="CPM", y="Counts") +
+  theme_minimal() +
+  xlim(0,5000) +
+  ylim(0,200000) +
+  geom_hline(yintercept=100000, linetype="dashed", color = "blue") +
+  geom_vline(xintercept=3000, linetype="dashed", color = "blue")
+my.scatter
+```
+# 4000 CPM corresponds with a counts value of 50 000
+# CPM cutoff of 1.5 corresponds with a read count of 20
+
+
+```{r}
+above.thresh <- (mycpm > 1.5)
+num.samples.aboveThresh <- rowSums(above.thresh)
+head(num.samples.aboveThresh)
+```
+
+```{r}
+Q8.df <- as.data.frame(num.samples.aboveThresh)
+
+Q8.hist <- ggplot(data=Q8.df, aes(x=num.samples.aboveThresh)) +
+  geom_histogram(binwidth=1) +
+  ggtitle("Distribution of number of samples with a CPM > 4") +
+  labs(y= "Frequency", x= "Number of samples") +
+  theme_minimal() +
+  geom_vline(xintercept=209, linetype="dashed", color = "red")
+Q8.hist
+```
+
+
+```{r}
+# keep genes if 209 or more (over half) samples meet the CPM cutoff
+keep.genes <- names(which(num.samples.aboveThresh >= 209))
+```
+
+```{r}
+if (length(keep.genes) != length(Q8.df)) {
+  #checking that keep.genes successfully only keeps genes with counts above 14
+  Q9.df <- as.data.frame(num.samples.aboveThresh[keep.genes])
+  Q9.hist <- ggplot(data=Q9.df, aes(x=num.samples.aboveThresh[keep.genes])) +
+    geom_histogram(binwidth=1) +
+    ggtitle("Distribution of genes with CPM > 1.5 AND number of samples >= 26") +
+    labs(y= "Frequency", x= "Number of samples") +
+    theme_minimal()
+  
+  data3.keep <- data3[keep.genes,]
+  Q9.hist
+}
+```
+
+```{r}
+dim(data3.keep)
+```
+
+```{r}
+# boxplots to check distribution of read counts across samples
+
+
+
+Q10.dgeObj <- DGEList(data3.keep)
+names(Q10.dgeObj)
+
+log.cpm <- cpm(Q10.dgeObj, log=TRUE)
+head(log.cpm,2)
+log.cpm.df <- data.frame()
+```
+
+# Taking a sample of 200 points from the original dataset of 1030, because plotmds is taking too long with all 1030 points
+```{r}
+set.seed(123) 
+indices <- sample(1:ncol(data3.keep), 200) 
+sample_df <- data3.keep[, indices]
+sample_labels <- data3_labels[indices,]
+
+
+Q10.dgeObj <- DGEList(sample_df)
+names(Q10.dgeObj)
+
+log.cpm <- cpm(Q10.dgeObj, log=TRUE)
+head(log.cpm,2)
+log.cpm.df <- data.frame()
+```
+
+
+```{r}
+for (my.sample in colnames(data3)) {
+  mat <- cbind(Sample = rep(my.sample, nrow(log.cpm)),
+               Log.CPM = log.cpm[, my.sample])
+  log.cpm.df <- rbind(log.cpm.df, mat)
+}
+head(log.cpm.df,2)
+log.cpm.df$Log.CPM <- as.numeric(log.cpm.df$Log.CPM)
+log.cpm.df$Sample <- as.factor(log.cpm.df$Sample)
+```
+
+```{r}
+Q11.boxplot <- ggplot(log.cpm.df, aes(x=Sample, y=Log.CPM)) +
+  geom_boxplot() +
+  xlab("Samples") +ylab("Log CPM") +
+  ggtitle("Log CPM Across Samples")
+Q11.boxplot    
+```
+
+
+```{r}
+col.condition <- c("purple","orange","red")[as.factor(sample_labels)]
+data.frame(sample_labels, col.condition)
+plotMDS(Q10.dgeObj,col=col.condition, cex=0.8)
+legend("right",fill=c("purple","orange","red"),
+       legend=levels(as.factor(sample_labels)))
+title("Condition")
+```
+
+
+```{r}
+dgeObj <- DGEList(data3.keep)
+dgeObj <- calcNormFactors(dgeObj)
+dgeObj$samples
+```
+
+
+```{r}
+data3_labels <- as.data.frame(data3_labels)
+names(data3_labels) <- "Condition"
+design <- as.formula(~Condition)
+modelMatrix <- model.matrix(design, data=data3_labels)
+```
+
+
+```{r}
+dgeObj <- estimateCommonDisp(dgeObj) # estimate a common dispersion value across all genes
+dgeObj <- estimateGLMTrendedDisp(dgeObj) # abundance-dispersion trend by cox-reid approximate profile lieklihood
+dgeObj <- estimateTagwiseDisp(dgeObj) # tagwise dispersion by empirical bays method based on weighted conditional maximum likelihood
+```
+
+```{r}
+plotBCV(dgeObj)
+fit <- glmQLFit(y=dgeObj, design=modelMatrix) # gene-wise general linear model
+
+```
+
+```{r}
+lrt.CDvsHC <- glmLRT(fit,coef="ConditionHC")
+lrt.CDvsUC <- glmLRT(fit,coef="ConditionUC")
+lrt.HCvsUC <- glmLRT(fit,contrast=c(0,-1,1))
+```
+
+```{r}
+CDvsHC <- topTags(lrt.CDvsHC)
+CDvsUC <- topTags(lrt.CDvsUC)
+HCvsUC <- topTags(lrt.HCvsUC)
+```
+
+```{r}
+write.csv(rownames, file = "./rownames.csv", row.names = FALSE)
+CDvsHC_genes
+CDvsUC_genes
+HCvsUC_genes
+```
+
+
+```{r}
+# 20 most differentially expressed genes are chosen for go and kegg enrichment analysis with FDR values of 10e-6 to 10e-10
+deCDUC <- decideTestsDGE(lrt.CDvsUC, p.value=0.1)
+summary(deCDUC)
+deUCControl <- decideTestsDGE(lrt.HCvsUC,p.value=0.1)
+summary(deUCControl)
+deCDControl <- decideTestsDGE(lrt.CDvsHC,p.value=0.1)
+summary(deCDControl)
+```
+
+```{r}
+detagsCDUC <- rownames(dgeObj)[as.logical(deCDUC)]
+plotSmear(lrt.CDvsUC, de.tags=detagsCDUC)
+title("Crohn's disease vs Ulcerative colitis")
+
+detagsUCControl <- rownames(dgeObj)[as.logical(deUCControl)]
+plotSmear(lrt.HCvsUC, de.tags=detagsUCControl)
+title("Ulcerative colitis vs Control")
+
+detagsCDControl <- rownames(dgeObj)[as.logical(deCDControl)]
+plotSmear(lrt.CDvsHC, de.tags=detagsCDControl)
+title("Crohn's disease vs Control")
+```
+
+
+```{r}
+# check if genes exist in the database
+library(org.Hs.eg.db)
+all.genes <- rownames(lrt.CDvsUC)
+length(all.genes)
+
+status <- all.genes %in% keys(org.Hs.eg.db, keytype="ENSEMBL")
+length(which(status==FALSE))
+
+ann <- select(org.Hs.eg.db, keys=rownames(lrt.HCvsUC),
+              columns=c("SYMBOL","ENTREZID","GENENAME"),
+              keytype="ENSEMBL")
+not.duplicated <- (!duplicated(ann[,1]))
+ann <- ann[not.duplicated,]
+CDUC.annotated <- cbind(lrt.CDvsUC,ann)
+UCControl.annotated <- cbind(lrt.HCvsUC,ann)
+CDControl.annotated <- cbind(lrt.CDvsHC,ann)
+```
+
+
+```{r}
+# Volcano plot
+negLogPvalue <- -log10(CDUC.annotated$PValue)
+Significant <- (negLogPvalue >= -log10(0.1))
+different <- abs(CDUC.annotated$logFC) >= 1.5
+Coloured <- Significant & different
+CDUC.annotated <- cbind(lrt.CDvsUC, negLogPvalue, Coloured, ann)
+CDUC.annotated$logFC <- as.numeric(CDUC.annotated$logFC)
+CDUC.annotated$Coloured <- as.factor(CDUC.annotated$Coloured)
+scatter.pl <- ggplot(CDUC.annotated, aes(logFC, negLogPvalue)) +
+  geom_point(color = 1+Coloured) +
+  geom_hline(yintercept=-log10(0.1), linetype="dashed", color = "blue") +
+  geom_vline(xintercept=1.5, linetype="dashed", color = "blue") +
+  geom_vline(xintercept=-1.5, linetype="dashed", color = "blue") +
+  labs(x="Log Fold Change", y="-log10(P value)") +
+  theme_light()
+scatter.pl
+```
+
+
+```{r}
+negLogPvalue <- -log10(UCControl.annotated$PValue)
+Significant <- (negLogPvalue >= -log10(0.1))
+different <- abs(UCControl.annotated$logFC) >= 1.5
+Coloured <- Significant & different
+UCControl.annotated <- cbind(lrt.HCvsUC, negLogPvalue, Coloured, ann)
+UCControl.annotated$logFC <- as.numeric(UCControl.annotated$logFC)
+UCControl.annotated$Coloured <- as.factor(UCControl.annotated$Coloured)
+scatter.pl <- ggplot(UCControl.annotated, aes(logFC, negLogPvalue)) +
+  geom_point(color = 1+Coloured) +
+  geom_hline(yintercept=-log10(0.1), linetype="dashed", color = "blue") +
+  geom_vline(xintercept=1.5, linetype="dashed", color = "blue") +
+  geom_vline(xintercept=-1.5, linetype="dashed", color = "blue") +
+  labs(x="Log Fold Change", y="-log10(P value)") +
+  theme_light()
+scatter.pl
+```
+
+```{r}
+negLogPvalue <- -log10(CDControl.annotated$PValue)
+Significant <- (negLogPvalue >= -log10(0.1))
+different <- abs(CDControl.annotated$logFC) >= 1.5
+Coloured <- Significant & different
+CDControl.annotated <- cbind(lrt.CDvsHC, negLogPvalue, Coloured, ann)
+CDControl.annotated$logFC <- as.numeric(CDControl.annotated$logFC)
+CDControl.annotated$Coloured <- as.factor(CDControl.annotated$Coloured)
+scatter.pl <- ggplot(CDControl.annotated, aes(logFC, negLogPvalue)) +
+  geom_point(color = 1+Coloured) +
+  geom_hline(yintercept=-log10(0.1), linetype="dashed", color = "blue") +
+  geom_vline(xintercept=1.5, linetype="dashed", color = "blue") +
+  geom_vline(xintercept=-1.5, linetype="dashed", color = "blue") +
+  labs(x="Log Fold Change", y="-log10(P value)") +
+  theme_light()
+scatter.pl
+```
+
+```{r}
+# GO set enrichment analysis
+library(goseq)
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#   install.packages("BiocManager")
+# BiocManager::install("TxDb.Hsapiens.UCSC.hg38.knownGene")
+
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+
+CDUC <- as.data.frame(topTags(lrt.CDvsUC, n=Inf))
+CDUC.genes <- CDUC$FDR < 0.1
+names(CDUC.genes) <- rownames(CDUC)
+pwf <- nullp(CDUC.genes,"hg19","ensGene")
+CDUC.go.results <- goseq(pwf,"hg19","ensGene")
+top20pathways <- CDUC.go.results[1:20,]
+neglogP <- log10(top20pathways$over_represented_pvalue)
+top20pathways <- cbind(top20pathways, neglogP)
+ggplot(top20pathways, aes(x=reorder(term, -neglogP), y=neglogP)) +
+  geom_bar(stat="identity") +
+  xlab("Enriched Pathways") +
+  ggtitle("Enriched Biological Pathways for Crohn's Disease vs Ulcerative Colitis") +
+  theme_light() +
+  coord_flip()
+```
+
+
+```{r}
+UCControl <- as.data.frame(topTags(lrt.HCvsUC, n=Inf))
+UCControl.genes <- UCControl$FDR < 0.1
+names(UCControl.genes) <- rownames(UCControl)
+pwf <- nullp(UCControl.genes,"hg19","ensGene")
+UCControl.go.results <- goseq(pwf,"hg19","ensGene")
+top20pathways <- UCControl.go.results[1:20,]
+neglogP <- log10(top20pathways$over_represented_pvalue)
+top20pathways <- cbind(top20pathways, neglogP)
+ggplot(top20pathways, aes(x=reorder(term, -neglogP), y=neglogP)) +
+  geom_bar(stat="identity") +
+  xlab("Enriched Pathways") +
+  ggtitle("Enriched Biological Pathways for Ulcerative Colitis vs Control samples") +
+  theme_light() +
+  coord_flip()
+```
+
+
+```{r}
+CDControl <- as.data.frame(topTags(lrt.CDvsHC, n=Inf))
+CDControl.genes <- CDControl$FDR < 0.1
+names(CDControl.genes) <- rownames(CDControl)
+pwf <- nullp(CDControl.genes,"hg19","ensGene")
+CDControl.go.results <- goseq(pwf,"hg19","ensGene")
+top20pathways <- CDControl.go.results[1:20,]
+neglogP <- log10(top20pathways$over_represented_pvalue)
+top20pathways <- cbind(top20pathways, neglogP)
+ggplot(top20pathways, aes(x=reorder(term, -neglogP), y=neglogP)) +
+  geom_bar(stat="identity") +
+  xlab("Enriched Pathways") +
+  ggtitle("Enriched Biological Pathways for Crohn's Disease vs  Control Samples") +
+  theme_light() +
+  coord_flip()
+```
+
+
+
+
+
