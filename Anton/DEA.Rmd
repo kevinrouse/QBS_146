@@ -247,17 +247,26 @@ lrt.CDvsUC <- glmLRT(fit,coef="ConditionUC")
 lrt.HCvsUC <- glmLRT(fit,contrast=c(0,-1,1))
 ```
 
+
 ```{r}
-CDvsHC <- topTags(lrt.CDvsHC)
-CDvsUC <- topTags(lrt.CDvsUC)
-HCvsUC <- topTags(lrt.HCvsUC)
+CDvsHC <- topTags(lrt.CDvsHC, n=50)
+CDvsUC <- topTags(lrt.CDvsUC, n=50)
+HCvsUC <- topTags(lrt.HCvsUC, n=50)
 ```
 
 ```{r}
-write.csv(rownames, file = "./rownames.csv", row.names = FALSE)
-CDvsHC_genes
-CDvsUC_genes
-HCvsUC_genes
+# CDvsHC["p.adjusted"] <- CDvsHC$table$PValue*16820
+# CDvsUC["p.adjusted"] <- CDvsUC$table$PValue*16820
+# HCvsUC["p.adjusted"] <- HCvsUC$table$PValue*16820
+```
+
+```{r}
+write.csv(rownames(CDvsHC), file = "/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/Anton/CDvsHC_genes.csv", row.names = FALSE)
+write.csv(rownames(CDvsUC), file = "/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/Anton/CDvsUC_genes.csv", row.names = FALSE)
+write.csv(rownames(HCvsUC), file = "/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/Anton/HCvsUC_genes.csv", row.names = FALSE)
+
+
+
 ```
 
 

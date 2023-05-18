@@ -12,17 +12,28 @@ knitr::opts_chunk$set(echo = TRUE)
 LOADING THE THREE DATASETS
 ```{r}
 
-data1 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE174159_raw_counts_S16082.txt", sep="\t", row.names=1)
+data1 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/data1.csv", sep=",", row.names=1)
 colnames(data1)[-1] = unlist(lapply(colnames(data1)[-1],substring,first=2))
+# data1_sorted = data1[,c(1,match(names(data1)[-1], names(status)))]
+
 
 data2 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE126299_featurecounts_upload.gene.quant.txt", sep = "\t", row.names=1)
 
-data3 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/GSE186507_MSCCR_Blood_counts.txt", sep=" ")
+data3 = read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/project/GSE186507_MSCCR_Blood_counts.txt", sep=" ")
 
 ```
 
 LOADING data3 labels
 ```{r}
+data1_labels = unname(unlist(status[ ]))
+
 data3_labels <- read.csv("/Users/anton/Library/CloudStorage/GoogleDrive-anton.m.hung.gr@dartmouth.edu/Mon disque/spring term/bioinformatics/genehub/data/data3_labels.csv")
 ```
 
+```{r}
+# Match row names using gene symbol
+common_genes <- intersect(row.names(data1), intersect(row.names(data2),row.names(data3)))
+data1_matched <- data1[common_genes, ]
+data2_matched <- data2[common_genes, ]
+data3_matched<- data3[common_genes, ]
+```
