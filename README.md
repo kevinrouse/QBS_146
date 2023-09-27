@@ -1,2 +1,2 @@
-# Course Project for QBS 177. 
-Goal was to use machine learning on a tumor dataset to be able to predict if a tumor is malignant or benign. K-Means Clustering, Linear Discriminant Analysis,  (LDA)Decision Tree/Random Forest,Neural Network were used. The code as well as the presentation of results are in this repository.
+# Course Project for QBS 146. 
+Goal was to use differential gene expression analysis with batch normalization to differntiate between healthy controls and patients with IBD. Used various clustering approaches to try and distinguish the two groups. The code as well as the presentation are located in this repository.
